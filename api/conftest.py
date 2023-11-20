@@ -308,9 +308,15 @@ def reset_cache():
     # https://groups.google.com/g/django-developers/c/zlaPsP13dUY
     # TL;DR: Use this if your test interacts with cache since django
     # does not clear cache after every test
-    [cache.clear() for cache in caches.all()]
+    # Clear all caches before the test
+    for cache in caches.all():
+        cache.clear()
+
     yield
-    [cache.clear() for cache in caches.all()]
+
+    # Clear all caches after the test
+    for cache in caches.all():
+        cache.clear()
 
 
 @pytest.fixture()
