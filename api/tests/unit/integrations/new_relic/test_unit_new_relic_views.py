@@ -7,14 +7,14 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from environments.models import Environment
-from integrations.amplitude.models import AmplitudeConfiguration
+from integrations.new_relic.models import NewRelicConfiguration
 from organisations.models import Organisation, OrganisationRole
 from projects.models import Project
 from util.tests import Helper
 
 
 @pytest.mark.django_db
-class AmplitudeConfigurationTestCase(TestCase):
+class NewRelicConfigurationTestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
         user = Helper.create_ffadminuser()
@@ -32,13 +32,16 @@ class AmplitudeConfigurationTestCase(TestCase):
             name="Test Environment", project=self.project
         )
         self.list_url = reverse(
-            "api-v1:environments:integrations-amplitude-list",
-            args=[self.environment.api_key],
+            "api-v1:projects:integrations-new-relic-list", args=[self.project.id]
         )
 
-    def test_should_create_amplitude_config_when_post(self):
-        # Given
-        data = {"api_key": "abc-123"}
+    def test_should_create_new_relic_config_when_post(self):
+        # Given setup data
+        data = {
+            "base_url": "http://test.com",
+            "api_key": "key-123",
+            "app_id": "app-123",
+        }
 
         # When
         response = self.client.post(
@@ -49,19 +52,24 @@ class AmplitudeConfigurationTestCase(TestCase):
 
         # Then
         assert response.status_code == status.HTTP_201_CREATED
-        assert (
-            AmplitudeConfiguration.objects.filter(environment=self.environment).count()
-            == 1
-        )
+        # and
+        assert NewRelicConfiguration.objects.filter(project=self.project).count() == 1
 
-    def test_should_return_BadRequest_when_duplicate_amplitude_config_is_posted(self):
+    def test_should_return_BadRequest_when_duplicate_new_relic_config_is_posted(self):
         # Given
-        config = AmplitudeConfiguration.objects.create(
-            api_key="api_123", environment=self.environment
+        NewRelicConfiguration.objects.create(
+            base_url="http://test.com",
+            api_key="key-123",
+            app_id="app-123",
+            project=self.project,
         )
+        data = {
+            "base_url": "http://test.com",
+            "api_key": "key-123",
+            "app_id": "app-123",
+        }
 
         # When
-        data = {"api_key": config.api_key}
         response = self.client.post(
             self.list_url,
             data=json.dumps(data),
@@ -70,24 +78,30 @@ class AmplitudeConfigurationTestCase(TestCase):
 
         # Then
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert (
-            AmplitudeConfiguration.objects.filter(environment=self.environment).count()
-            == 1
-        )
+        assert NewRelicConfiguration.objects.filter(project=self.project).count() == 1
 
+    #
     def test_should_update_configuration_when_put(self):
         # Given
-        config = AmplitudeConfiguration.objects.create(
-            api_key="api_123", environment=self.environment
+        config = NewRelicConfiguration.objects.create(
+            base_url="http://test.com",
+            api_key="key-123",
+            app_id="app-123",
+            project=self.project,
         )
 
         api_key_updated = "new api"
-        data = {"api_key": api_key_updated}
+        app_id_updated = "new app"
+        data = {
+            "base_url": config.base_url,
+            "api_key": api_key_updated,
+            "app_id": app_id_updated,
+        }
 
         # When
         url = reverse(
-            "api-v1:environments:integrations-amplitude-detail",
-            args=[self.environment.api_key, config.id],
+            "api-v1:projects:integrations-new-relic-detail",
+            args=[self.project.id, config.id],
         )
         response = self.client.put(
             url,
@@ -99,8 +113,9 @@ class AmplitudeConfigurationTestCase(TestCase):
         # Then
         assert response.status_code == status.HTTP_200_OK
         assert config.api_key == api_key_updated
+        assert config.app_id == app_id_updated
 
-    def test_should_return_amplitude_config_list_when_requested(self):
+    def test_should_return_new_relic_config_list_when_requested(self):
         # Given - set up data
 
         # When
@@ -111,56 +126,44 @@ class AmplitudeConfigurationTestCase(TestCase):
 
     def test_should_remove_configuration_when_delete(self):
         # Given
-        config = AmplitudeConfiguration.objects.create(
-            api_key="api_123", environment=self.environment
+        config = NewRelicConfiguration.objects.create(
+            base_url="http://test.com",
+            api_key="key-123",
+            app_id="app-123",
+            project=self.project,
         )
-
         # When
         url = reverse(
-            "api-v1:environments:integrations-amplitude-detail",
-            args=[self.environment.api_key, config.id],
+            "api-v1:projects:integrations-new-relic-detail",
+            args=[self.project.id, config.id],
         )
         res = self.client.delete(url)
 
         # Then
         assert res.status_code == status.HTTP_204_NO_CONTENT
         #  and
-        assert not AmplitudeConfiguration.objects.filter(
-            environment=self.environment
-        ).exists()
+        assert not NewRelicConfiguration.objects.filter(project=self.project).exists()
 
 
-def test_create_amplitude_integration(environment, admin_client):
-    # Given
-    url = reverse(
-        "api-v1:environments:integrations-amplitude-list", args=[environment.api_key]
-    )
-
-    # When
-    response = admin_client.post(
-        path=url,
-        data=json.dumps({"api_key": "some-key"}),
-        content_type="application/json",
-    )
-
-    # Then
-    assert response.status_code == status.HTTP_201_CREATED
-
-
-def test_create_amplitude_integration_in_environment_with_deleted_integration(
-    environment, admin_client, deleted_amplitude_integration
+def test_create_newrelic_configuration_in_project_with_deleted_configuration(
+    admin_client, project, deleted_newrelic_configuration
 ):
     # Given
-    url = reverse(
-        "api-v1:environments:integrations-amplitude-list", args=[environment.api_key]
-    )
+    url = reverse("api-v1:projects:integrations-new-relic-list", args=[project.id])
+
+    api_key, base_url, app_id = "some-key", "https://api.newrelic.com/", "1"
 
     # When
     response = admin_client.post(
         path=url,
-        data=json.dumps({"api_key": "some-key"}),
+        data=json.dumps({"api_key": api_key, "base_url": base_url, "app_id": app_id}),
         content_type="application/json",
     )
 
     # Then
     assert response.status_code == status.HTTP_201_CREATED
+
+    response_json = response.json()
+    assert response_json["api_key"] == api_key
+    assert response_json["base_url"] == base_url
+    assert response_json["app_id"] == app_id
