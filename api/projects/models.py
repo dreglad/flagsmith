@@ -71,6 +71,10 @@ class Project(LifecycleModelMixin, SoftDeleteExportableModel):
         default=100,
         help_text="Max segments overrides allowed for any (one) environment within this project",
     )
+    stale_flags_limit_days = models.IntegerField(
+        default=30,
+        help_text="Number of days without modification in any environment before a flag is considered stale.",
+    )
 
     objects = ProjectManager()
 
