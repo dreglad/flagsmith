@@ -181,6 +181,8 @@ export type Tag = {
   description: string
   project: number
   label: string
+  is_system_tag: boolean
+  is_permanent: boolean
 }
 
 export type MultivariateFeatureStateValue = {
