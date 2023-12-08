@@ -1,7 +1,7 @@
 const _data = require('../../common/data/base/_data')
 let promise
 module.exports = () => {
-  if (!promise) {
+  if (!promise && !E2E) {
     promise = Promise.all([
       _data.get('/version').catch(() => ({})),
       _data
